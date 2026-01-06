@@ -1,0 +1,6 @@
+[
+  {
+    "label": "Build and Run",
+    "command": "swift build -c release && ./.build/release/SortLine && ln -sf $(pwd)/.build/release/SortLine /usr/local/bin/sortline",
+  },
+]
