@@ -1,10 +1,16 @@
 import Foundation
 
 
-let version = "1.3.1"
+let version = "1.3.2"
 let fm = FileManager.default
 let cmdLine = CommandLine.arguments
 let cwd = URL(fileURLWithPath: FileManager.default.currentDirectoryPath)
+var availablePrefixesByFileType: [String: [Substring]] = [
+    "py": ["import", "from"],
+    "swift": ["import"],
+    "rs": ["use"],
+    "nil-file": ["import"]
+]
 
 if cmdLine.contains("-h") || cmdLine.count == 1{
     //print(CommandLine.arguments.first!)
@@ -27,9 +33,13 @@ struct ArgSpace{
 
 
 final class FileOptimizer {
-    private static let importPrefixes: [Substring] = ["import ", "from "]
+    private let importPrefixes: [Substring]
 
-    static func sortFileHighPerformance(at path: String, flags: ArgSpace) -> Int {
+    init(importPrefixes: [Substring]) {
+        self.importPrefixes = importPrefixes
+    }
+
+    func sortFileHighPerformance(at path: String, flags: ArgSpace) -> Int {
         let url = URL(fileURLWithPath: path)
 
         guard let fileHandle = FileHandle(forReadingAtPath: path),
@@ -91,7 +101,7 @@ final class FileOptimizer {
         return lines.count
     }
 
-    static func sortAllLinesSimple(at path: String) -> Int {
+    func sortAllLinesSimple(at path: String) -> Int {
         let url = URL(fileURLWithPath: path)
         guard let fileHandle = FileHandle(forReadingAtPath: path),
               let data = try! fileHandle.readToEnd(),
@@ -134,11 +144,16 @@ if CommandLine.arguments.count > 1{
 
     var lines = 0
     for path in paths{
-        if flags.verbose { print("[System] Sorting: \(path)...") }
-        if flags.allTypes{
-            lines += FileOptimizer.sortAllLinesSimple(at: path)
+        if let fileExtension = path.split(separator: ".").last{
+            let optimiser = FileOptimizer(importPrefixes: availablePrefixesByFileType[String(fileExtension)] ?? availablePrefixesByFileType["nil-file"]!)
+            if flags.verbose { print("[System] Sorting: \(path)...") }
+            if flags.allTypes{
+                lines += optimiser.sortAllLinesSimple(at: path)
+            }else{
+                lines += optimiser.sortFileHighPerformance(at: path, flags: flags)
+            }
         }else{
-            lines += FileOptimizer.sortFileHighPerformance(at: path, flags: flags)
+            print("[System] Error, Unable to determine file extension for \(path)")
         }
     }
 
