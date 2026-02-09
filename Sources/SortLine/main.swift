@@ -1,15 +1,15 @@
 import Foundation
 
 
-let version = "1.3.2"
+let version = "1.3.3"
 let fm = FileManager.default
 let cmdLine = CommandLine.arguments
 let cwd = URL(fileURLWithPath: FileManager.default.currentDirectoryPath)
 var availablePrefixesByFileType: [String: [Substring]] = [
     "py": ["import", "from"],
     "swift": ["import"],
-    "rs": ["use"],
-    "nil-file": ["import"]
+    "rs": ["use", "mod"],
+    "nil-file": []
 ]
 
 if cmdLine.contains("-h") || cmdLine.count == 1{
