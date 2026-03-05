@@ -1,7 +1,6 @@
 import Foundation
 
-
-let version = "1.3.3"
+let version = "1.3.4"
 let fm = FileManager.default
 let cmdLine = CommandLine.arguments
 let cwd = URL(fileURLWithPath: FileManager.default.currentDirectoryPath)
@@ -9,12 +8,12 @@ var availablePrefixesByFileType: [String: [Substring]] = [
     "py": ["import", "from"],
     "swift": ["import"],
     "rs": ["use", "mod"],
-    "nil-file": []
+    "nil-file": [],
 ]
 
-if cmdLine.contains("-h") || cmdLine.count == 1{
+if cmdLine.contains("-h") || cmdLine.count == 1 {
     //print(CommandLine.arguments.first!)
-    print("SortLine: Sorts Python imports in a file by their length")
+    print("SortLine: Sorts imports in a file by their length in various languages")
     print("Version:", version)
     print("Usage:")
     print("\tsortline <file1> <file2>...")
@@ -24,13 +23,10 @@ if cmdLine.contains("-h") || cmdLine.count == 1{
     exit(0)
 }
 
-
-
-struct ArgSpace{
+struct ArgSpace {
     var allTypes: Bool = false
     var verbose: Bool = false
 }
-
 
 final class FileOptimizer {
     private let importPrefixes: [Substring]
@@ -43,11 +39,12 @@ final class FileOptimizer {
         let url = URL(fileURLWithPath: path)
 
         guard let fileHandle = FileHandle(forReadingAtPath: path),
-              let data = try! fileHandle.readToEnd(),
-              let content = String(data: data, encoding: .utf8) else {
-              if flags.verbose {
-                  print("[System] Failed to read: \(path)")
-              }
+            let data = try! fileHandle.readToEnd(),
+            let content = String(data: data, encoding: .utf8)
+        else {
+            if flags.verbose {
+                print("[System] Failed to read: \(path)")
+            }
             return 0
         }
 
@@ -61,15 +58,18 @@ final class FileOptimizer {
 
         for (i, line) in lines.enumerated() {
 
-
             let isImport = importPrefixes.contains { line.hasPrefix($0) }
 
             if isImport {
                 // Fast check for parentheses using UTF8 view
-                let hasParens = line.utf8.contains(UInt8(ascii: "(")) ||
-                               line.utf8.contains(UInt8(ascii: ")"))
+                let hasParens =
+                    line.utf8.contains(UInt8(ascii: "(")) || line.utf8.contains(UInt8(ascii: ")"))
 
-                if !hasParens {
+                // do the same of curly braces
+                let hasCurlyBraces =
+                    line.utf8.contains(UInt8(ascii: "{")) || line.utf8.contains(UInt8(ascii: "}"))
+
+                if !hasParens && !hasCurlyBraces {
                     if firstImportIndex == nil {
                         firstImportIndex = result.count
                     }
@@ -92,7 +92,7 @@ final class FileOptimizer {
         let newContent = result.joined(separator: "\n")
 
         // Write with buffering for large files
-        do{
+        do {
             try newContent.write(to: url, atomically: false, encoding: .utf8)
         } catch {
             print("Error writing to file: \(error)")
@@ -104,9 +104,10 @@ final class FileOptimizer {
     func sortAllLinesSimple(at path: String) -> Int {
         let url = URL(fileURLWithPath: path)
         guard let fileHandle = FileHandle(forReadingAtPath: path),
-              let data = try! fileHandle.readToEnd(),
-              let content = String(data: data, encoding: .utf8) else {
-              print("[System] Failed to read: \(path)")
+            let data = try! fileHandle.readToEnd(),
+            let content = String(data: data, encoding: .utf8)
+        else {
+            print("[System] Failed to read: \(path)")
             return 0
         }
 
@@ -115,8 +116,9 @@ final class FileOptimizer {
         var linesWithCounts = lines.map { ($0, $0.count) }
         linesWithCounts.sort(by: { $0.1 < $1.1 })
         let sortedLines = linesWithCounts.map { $0.0 }
-        do{
-            try sortedLines.joined(separator: "\n").write(to: url, atomically: false, encoding: .utf8)
+        do {
+            try sortedLines.joined(separator: "\n").write(
+                to: url, atomically: false, encoding: .utf8)
         } catch {
             print("Error writing to file: \(error)")
         }
@@ -125,9 +127,7 @@ final class FileOptimizer {
     }
 }
 
-
-
-if CommandLine.arguments.count > 1{
+if CommandLine.arguments.count > 1 {
     var paths = CommandLine.arguments[1...]
     var flags = ArgSpace()
     if CommandLine.arguments.contains("--all-types") {
@@ -143,16 +143,18 @@ if CommandLine.arguments.count > 1{
     }
 
     var lines = 0
-    for path in paths{
-        if let fileExtension = path.split(separator: ".").last{
-            let optimiser = FileOptimizer(importPrefixes: availablePrefixesByFileType[String(fileExtension)] ?? availablePrefixesByFileType["nil-file"]!)
+    for path in paths {
+        if let fileExtension = path.split(separator: ".").last {
+            let optimiser = FileOptimizer(
+                importPrefixes: availablePrefixesByFileType[String(fileExtension)]
+                    ?? availablePrefixesByFileType["nil-file"]!)
             if flags.verbose { print("[System] Sorting: \(path)...") }
-            if flags.allTypes{
+            if flags.allTypes {
                 lines += optimiser.sortAllLinesSimple(at: path)
-            }else{
+            } else {
                 lines += optimiser.sortFileHighPerformance(at: path, flags: flags)
             }
-        }else{
+        } else {
             print("[System] Error, Unable to determine file extension for \(path)")
         }
     }
