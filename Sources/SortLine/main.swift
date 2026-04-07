@@ -1,6 +1,6 @@
 import Foundation
 
-let version = "1.3.4"
+let version = "1.3.5"
 let fm = FileManager.default
 let cmdLine = CommandLine.arguments
 let cwd = URL(fileURLWithPath: FileManager.default.currentDirectoryPath)
@@ -62,14 +62,14 @@ final class FileOptimizer {
 
             if isImport {
                 // Fast check for parentheses using UTF8 view
-                let hasParens =
-                    line.utf8.contains(UInt8(ascii: "(")) || line.utf8.contains(UInt8(ascii: ")"))
+                let hasParens = line.utf8.contains(UInt8(ascii: "(")) || line.utf8.contains(UInt8(ascii: ")"))
 
                 // do the same of curly braces
-                let hasCurlyBraces =
-                    line.utf8.contains(UInt8(ascii: "{")) || line.utf8.contains(UInt8(ascii: "}"))
+                let hasUnClosedBraces_0 = line.utf8.contains(UInt8(ascii: "{")) && !line.utf8.contains(UInt8(ascii: "}"))
+                let hasUnClosedBraces_1 = !line.utf8.contains(UInt8(ascii: "{")) && line.utf8.contains(UInt8(ascii: "}"))
+                let hasUnClosedBraces = hasUnClosedBraces_0 || hasUnClosedBraces_1
 
-                if !hasParens && !hasCurlyBraces {
+                if !hasParens && !hasUnClosedBraces {
                     if firstImportIndex == nil {
                         firstImportIndex = result.count
                     }
@@ -141,6 +141,12 @@ if CommandLine.arguments.count > 1 {
         paths.removeAll(where: { $0 == "--verbose" })
         print("[System] Detected --verbose ")
     }
+    
+    if CommandLine.arguments.contains("--cli-path"){
+        print(CommandLine.arguments[0])
+        exit(0)
+    }
+    
 
     var lines = 0
     for path in paths {
@@ -158,7 +164,6 @@ if CommandLine.arguments.count > 1 {
             print("[System] Error, Unable to determine file extension for \(path)")
         }
     }
-
     print("[System] Sorted \(lines) lines, across \(paths.count) files")
     print("[System] Done")
     exit(0)
