@@ -1,6 +1,6 @@
 import Foundation
 
-let version = "1.3.5"
+let version = "1.4.5"
 let fm = FileManager.default
 let cmdLine = CommandLine.arguments
 let cwd = URL(fileURLWithPath: FileManager.default.currentDirectoryPath)
@@ -26,6 +26,7 @@ if cmdLine.contains("-h") || cmdLine.count == 1 {
 struct ArgSpace {
     var allTypes: Bool = false
     var verbose: Bool = false
+    var rustPub: Bool = false
 }
 
 final class FileOptimizer {
@@ -62,11 +63,14 @@ final class FileOptimizer {
 
             if isImport {
                 // Fast check for parentheses using UTF8 view
-                let hasParens = line.utf8.contains(UInt8(ascii: "(")) || line.utf8.contains(UInt8(ascii: ")"))
+                let hasParens =
+                    line.utf8.contains(UInt8(ascii: "(")) || line.utf8.contains(UInt8(ascii: ")"))
 
                 // do the same of curly braces
-                let hasUnClosedBraces_0 = line.utf8.contains(UInt8(ascii: "{")) && !line.utf8.contains(UInt8(ascii: "}"))
-                let hasUnClosedBraces_1 = !line.utf8.contains(UInt8(ascii: "{")) && line.utf8.contains(UInt8(ascii: "}"))
+                let hasUnClosedBraces_0 =
+                    line.utf8.contains(UInt8(ascii: "{")) && !line.utf8.contains(UInt8(ascii: "}"))
+                let hasUnClosedBraces_1 =
+                    !line.utf8.contains(UInt8(ascii: "{")) && line.utf8.contains(UInt8(ascii: "}"))
                 let hasUnClosedBraces = hasUnClosedBraces_0 || hasUnClosedBraces_1
 
                 if !hasParens && !hasUnClosedBraces {
@@ -130,40 +134,60 @@ final class FileOptimizer {
 if CommandLine.arguments.count > 1 {
     var paths = CommandLine.arguments[1...]
     var flags = ArgSpace()
-    if CommandLine.arguments.contains("--all-types") {
+
+    let cliArgs = CommandLine.arguments
+    if cliArgs.contains("--all-types") {
         flags.allTypes = true
         paths.removeAll(where: { $0 == "--all-types" })
         print("[System] Detected --all-types ")
     }
 
-    if CommandLine.arguments.contains("--verbose") {
+    if cliArgs.contains("--verbose") {
         flags.verbose = true
         paths.removeAll(where: { $0 == "--verbose" })
         print("[System] Detected --verbose ")
     }
-    
-    if CommandLine.arguments.contains("--cli-path"){
+
+    if cliArgs.contains("--cli-path") {
         print(CommandLine.arguments[0])
         exit(0)
     }
-    
+
+    if cliArgs.contains("--rust:pub") || cliArgs.contains("-rpub") {
+        flags.rustPub = true
+        paths.removeAll(where: { $0 == "--rust:pub" || $0 == "-rpub" })
+        print("[System] Detected --rust:pub ")
+    }
 
     var lines = 0
-    for path in paths {
-        if let fileExtension = path.split(separator: ".").last {
+    let pathsArray = Array(paths)
+    let lock = NSLock()
+
+    DispatchQueue.concurrentPerform(iterations: pathsArray.count) { index in
+        let path = pathsArray[index]
+
+        guard let fileExtension = path.split(separator: ".").last else {
+            print("[System] Error, Unable to determine file extension for \(path)")
+            return
+        }
+
+        if flags.rustPub {
+            RustLinter.pub_er(at: path)
+        } else {
             let optimiser = FileOptimizer(
                 importPrefixes: availablePrefixesByFileType[String(fileExtension)]
                     ?? availablePrefixesByFileType["nil-file"]!)
             if flags.verbose { print("[System] Sorting: \(path)...") }
-            if flags.allTypes {
-                lines += optimiser.sortAllLinesSimple(at: path)
-            } else {
-                lines += optimiser.sortFileHighPerformance(at: path, flags: flags)
-            }
-        } else {
-            print("[System] Error, Unable to determine file extension for \(path)")
+            let result =
+                flags.allTypes
+                ? optimiser.sortAllLinesSimple(at: path)
+                : optimiser.sortFileHighPerformance(at: path, flags: flags)
+            lock.lock()
+            lines += result
+            lock.unlock()
         }
     }
+
     print("[System] Sorted \(lines) lines, across \(paths.count) files")
     print("[System] Done")
     exit(0)
