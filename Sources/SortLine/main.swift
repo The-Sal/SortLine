@@ -1,6 +1,6 @@
 import Foundation
 
-let version = "1.4.5"
+let version = "2.4.5"
 let fm = FileManager.default
 let cmdLine = CommandLine.arguments
 let cwd = URL(fileURLWithPath: FileManager.default.currentDirectoryPath)
@@ -27,6 +27,7 @@ struct ArgSpace {
     var allTypes: Bool = false
     var verbose: Bool = false
     var rustPub: Bool = false
+    var lint: Bool = false
 }
 
 final class FileOptimizer {
@@ -159,9 +160,16 @@ if CommandLine.arguments.count > 1 {
         print("[System] Detected --rust:pub ")
     }
 
+    if cliArgs.contains("--lint") {
+        flags.lint = true
+        paths.removeAll(where: { $0 == "--lint" })
+        print("[System] Detected --lint")
+    }
+
     var lines = 0
     let pathsArray = Array(paths)
     let lock = NSLock()
+    let linter = Linter()
 
     DispatchQueue.concurrentPerform(iterations: pathsArray.count) { index in
         let path = pathsArray[index]
@@ -173,6 +181,10 @@ if CommandLine.arguments.count > 1 {
 
         if flags.rustPub {
             RustLinter.pub_er(at: path)
+        } else if flags.lint {
+            if path.contains(".rs") || path.contains(".py") || path.contains(".swift") {
+                linter.lint(at: path)
+            }
         } else {
             let optimiser = FileOptimizer(
                 importPrefixes: availablePrefixesByFileType[String(fileExtension)]
@@ -185,10 +197,10 @@ if CommandLine.arguments.count > 1 {
             lock.lock()
             lines += result
             lock.unlock()
+            print("[System] Sorted \(lines) lines, across \(paths.count) files")
         }
     }
 
-    print("[System] Sorted \(lines) lines, across \(paths.count) files")
     print("[System] Done")
     exit(0)
 } else {
