@@ -1,6 +1,6 @@
 import Foundation
 
-let version = "2.4.5"
+let version = "2.4.6"
 let fm = FileManager.default
 let cmdLine = CommandLine.arguments
 let cwd = URL(fileURLWithPath: FileManager.default.currentDirectoryPath)
@@ -197,10 +197,10 @@ if CommandLine.arguments.count > 1 {
             lock.lock()
             lines += result
             lock.unlock()
-            print("[System] Sorted \(lines) lines, across \(paths.count) files")
         }
     }
 
+    print("[System] Sorted \(lines) lines, across \(paths.count) files")
     print("[System] Done")
     exit(0)
 } else {
